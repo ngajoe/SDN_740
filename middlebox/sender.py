@@ -1,6 +1,12 @@
 import socket
 import sys
 import json
+import struct
+
+def send_msg(sock, msg):
+    # Prefix each message with a 4-byte length (network byte order)
+    msg = struct.pack('>I', len(msg)) + msg
+    sock.sendall(msg)
 
 json_file = "packets.json"
 f = open(json_file, "rb")
@@ -22,7 +28,8 @@ address = "128.105.145.163"
 try:
     print("ok")
     sock.connect((address, port))
-    sock.sendall(data)
+    # sock.sendall(data)
+    send_msg(sock, data)
     print("was sent!")
 except socket.gaierror:
 
