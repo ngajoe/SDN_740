@@ -1,0 +1,10 @@
+{
+    "packet2049": {
+        "SrcPort": "null",
+        "DstPort": "null",
+        "Timestamp": 1650852011.814987,
+        "Protocol": "icmp",
+        "DstIP": "172.16.7.4",
+        "SrcIP": "128.105.146.150"
+    }
+}
