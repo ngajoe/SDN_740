@@ -17,7 +17,7 @@ import struct
 blockedIPs = {} # SrcIP and Timestamp
 packetTrack = []
 expireTrack = 60 #How long before removing packets in tracking (seconds)
-
+timepoint = time.time()
 
 #RULE VARIABLES
 MAX_DstIP   = 2
@@ -46,8 +46,8 @@ class Packet:
     def compare(self, compPkt):
         if (self.protocol != compPkt.protocol):
             return False
-        elif (self.timestamp != compPkt.timestamp):
-            return False
+        #elif (self.timestamp != compPkt.timestamp):
+        #    return False
         elif (self.srcIP != compPkt.srcIP):
             return False
         elif (self.srcPort != compPkt.srcPort):
@@ -66,7 +66,8 @@ def readfile(filename):
     for i in data: #For each packet in json
         #print(i) 
         proto = data[i]["Protocol"]
-        ts = data[i]["Timestamp"]
+        #ts = data[i]["Timestamp"]
+        ts = timepoint
         SrcIP = data[i]["SrcIP"]
         SrcPort = data[i]["SrcPort"]
         DstIP = data[i]["DstIP"]
@@ -112,18 +113,21 @@ def listenport():
 
     try:
         c, addr = sock.accept()
+        timepoint = time.time()
         j = recv_msg(c)
         c.close()
     except socket.timeout :
         print("Timout occured...")
         #sock.close()
+        timepoint = time.time()
         return packetlist
 
     data = json.loads(j.decode("utf-8"))
     for i in data: #For each packet in json
             proto = data[i]["Protocol"]
             #print(proto)
-            ts = data[i]["Timestamp"]
+            #ts = data[i]["Timestamp"]
+            ts = timepoint
             #print(ts)
             SrcIP = data[i]["SrcIP"]
             #print(SrcIP)
@@ -163,13 +167,17 @@ while True:
         print("No Packets Received")
 
     print("-START-")
-    timepoint = time.time()
+    #timepoint = time.time()
     
 
 
     #packetTrack.append(newpackets[0])
     print("Time: " + str(timepoint))
     print("Packets Received: " + str(len(newpackets)))
+
+    #Flow compression filter - Remove identicals
+    newpackets = list(set(newpackets))
+    print("After flow compression: " + str(len(newpackets)))
 
     #Whitelisted IPs
     for goodIP in whitelist:
@@ -184,8 +192,13 @@ while True:
     print("After blocked filter: " + str(len(f_packets)))
 
     #Remove any new packets that are identical to those in the list
-    for existing in packetTrack:
-        f_packets = list(filter(lambda pkt: not pkt.compare(existing), f_packets))
+    #for existing in packetTrack:
+    #    f_packets = list(filter(lambda pkt: not pkt.compare(existing), f_packets))
+    #print("After compare filter: " + str(len(f_packets)))
+
+    #Remove old packets if newer identical packets have arrived
+    for new_pkt in f_packets:
+        PacketTrack = list(filter(lambda old_pkt: not old_pkt.compare(new_pkt), PacketTrack))
     print("After compare filter: " + str(len(f_packets)))
 
     #Load new packets into tracker    
@@ -230,23 +243,23 @@ while True:
                 newBlocks.append(s)
                 print("Exceeded MAX_DstPort: " + str(s))
 
-    # RULE 3: Too many Flows (Packets)
-    for s, count in CountSourceIPs.items():
-        if (count > MAX_Flows):
-            newBlocks.append(s)
-            print("Exceeded MAX_Flows: " + str(s))
+    # RULE 3: Too many Flows (Packets) - Disabled due to filter distribution
+    #for s, count in CountSourceIPs.items():
+    #    if (count > MAX_Flows):
+    #        newBlocks.append(s)
+    #        print("Exceeded MAX_Flows: " + str(s))
 
     # RULE 3A: Flagged as SYNFLOOD
     for p in f_packets:
-        if ((p.protocol == "synflood") and (s.srcIP not in newBlocks))
-            newBlocks.append(s.srcIP)
-            print("SYNflood Match: " + str(s))
+        if ((p.protocol == "synflood") and (p.srcIP not in newBlocks) ):
+            newBlocks.append(p.srcIP)
+            print("SYNflood Match: " + str(p.srcIP))
 
-    # RULE 4: Flow too long-lived
-    for s in f_packets:
-        if (s.timestamp < timepoint-MAX_TimeLive):
-            newBlocks.append(s.srcIP)
-            print("Exceeded MAX_TimeLive: " + str(s.srcIP))
+    # RULE 4: Flow too long-lived - Disabled due to filter distribution
+    #for s in f_packets:
+    #    if (s.timestamp < timepoint-MAX_TimeLive):
+    #        newBlocks.append(s.srcIP)
+    #        print("Exceeded MAX_TimeLive: " + str(s.srcIP))
 
     # Uniquify Blocks
     newBlocks = list(set(newBlocks))
