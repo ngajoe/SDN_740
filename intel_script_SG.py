@@ -25,6 +25,8 @@ MAX_DstPort = 2
 MAX_Flows   = 20
 MAX_TimeLive= 61 #TimeLive should be longer than expireTrack
 whitelist = ['128.105.146.150', '155.98.38.240', '10.10.10.10', '172.16.7.1', '108.69.65.69']
+SG_IPs = ['10.10.10.10', '172.16.7.1']
+SG_Ports = [5202,5203]
 
 expireBlock = 30 #How long before removing blocked IPs
 fwController = sys.argv[1]
@@ -192,6 +194,31 @@ while True:
 
         #newpackets = list(set(newpackets))
     #print("After flow compression: " + str(len(newpackets)))
+
+
+    
+    ################################################
+    #SAFEGUARD RULE #1- SERVER RETURNS COMMUNICATION ON GOOD IPs
+    #find the server's packets
+    b_packets = []
+
+    addme = list(filter(lambda pkt: (pkt.srcIP in SG_IPs) and (pkt.srcPort in SG_Ports), newpackets))
+    if len(addme) > 0:
+        b_packets.extend(addme)
+        
+        #print("safeIP:" + safeIP)
+        #print(addme)
+        #print("---")
+    print("Server SAFEGUARD packets found: "+ str(len(b_packets)))
+    #print(b_packets[0])
+
+
+    
+    #get the dstIPs from these packets, and remove them from tracking
+    for b_pkt in b_packets:
+        newpackets = list(filter(lambda n_pkt: n_pkt.srcIP != b_pkt.dstIP, newpackets))
+    print("After SAFEGUARD filter: "+  str(len(newpackets)))
+
 
     #Whitelisted IPs
     for goodIP in whitelist:
